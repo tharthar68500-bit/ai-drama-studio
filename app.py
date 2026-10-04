@@ -101,7 +101,7 @@ if generate_btn or next_volume_btn:
   else:
     try:
       genai.configure(api_key=api_key)
-      model = genai.GenerativeModel("gemini-1.5-flash")
+      model = genai.GenerativeModel(gemini-2.0-flash-exp)
 
       prompt = f"""
             သင်သည် ကျွမ်းကျင်သော ဒရာမာဇာတ်ညွှန်းရေးဆရာနှင့် AI Video Prompt Specialist တစ်ဦး ဖြစ်သည်။ 
