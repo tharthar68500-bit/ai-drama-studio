@@ -30,7 +30,7 @@ if st.button("ဇာတ်လမ်း စတင်ဖန်တီးမည်")
     try:
       # Gemini API ကို ချိတ်ဆက်ခြင်း
       genai.configure(api_key=api_key)
-      model = genai.GenerativeModel("gemini-1.5-flash")
+      model = genai.GenerativeModel("gemini-2.5-flash")
 
       # AI အတွက် Prompt တည်ဆောက်ခြင်း
       prompt = f"""
