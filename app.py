@@ -30,8 +30,8 @@ if st.button("ဇာတ်လမ်း စတင်ဖန်တီးမည်")
     try:
       # Gemini API ကို ချိတ်ဆက်ခြင်း
       genai.configure(api_key=api_key)
-      model = genai.GenerativeModel("gemini-2.5-flash")
-
+      model = genai.GenerativeModel(
+"gemini-3.8-flash")
       # AI အတွက် Prompt တည်ဆောက်ခြင်း
       prompt = f"""
             သင်သည် ကျွမ်းကျင်သော ဇာတ်ညွှန်းရေးဆရာတစ်ဦး ဖြစ်သည်။ အောက်ပါ ဇာတ်လမ်းအနှစ်ချုပ်ကို အခြေခံ၍ အောက်ပါအတိုင်း အသေးစိတ် ဖန်တီးပေးပါ -
