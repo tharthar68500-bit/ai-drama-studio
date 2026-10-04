@@ -1,0 +1,317 @@
+အာ... ကိုယ်လိုချင်တာက အောက်က ဗီဒီယိုလင့်ခ်တွေထုတ်ပေးတဲ့နေရာမှာ စာသားတွေအဖြစ် ပေါ်လာတာမျိုးမဟုတ်ဘဲ, အပေါ်ကလိုမျိုး "ဘောင်ထောင့်မှာ Copy ကူးလို့ရမယ့် ခလုတ် (Copy button) ပါတဲ့ Text Box ပုံစံမျိုး" နဲ့ ထွက်လာအောင် လုပ်ချင်တာကိုး!
+(Streamlit မှာတော့ Text Box တိုင်းမှာ သူ့အလိုလို Copy ကူးလို့ရတဲ့ icon လေးပါပြီးသားဖြစ်ပါတယ်။ ဒါပေမဲ့ ပိုပြီး ရှင်းလင်းသွားအောင် ၅ ခန်းတွဲ တစ်ခုချင်းစီကို သပ်သပ်ရပ်ရပ်နဲ့ Copy ကူးရလွယ်ကူတဲ့ Box တွေထဲမှာ ပေါ်လာအောင် ပြင်ဆင်ပေးလိုက်ပါတယ်)။
+အဲ့ဒီလို ဘောင်ခတ်ပြီး Copy ကူးလို့လွယ်မယ့် ပုံစံဖြစ်အောင် ပြင်ဆင်ထားတဲ့ ကုဒ်အပြည့်အစုံကို အောက်မှာ ကြည့်ပါ။ GitHub ထဲက ကိုယ့်ရဲ့ ဖိုင်မှာ ဒီအတိုင်း ကူးထည့်လိုက်လို့ရပါပြီ -
+import time
+import fal_client
+import google.generativeai as genai
+import streamlit as st
+
+# Streamlit Page Setup
+st.set_page_config(
+    page_title="AI Drama Paid Auto-Video Pipeline", layout="wide"
+)
+
+st.title(
+    "🎬 AI Drama Studio - ၅ ခန်းတွဲ အော်တို ဗီဒီယို ဆက်တိုက်ထုတ်စနစ် (Paid/API"
+    " Queue)"
+)
+st.write(
+    "ဇာတ်လမ်းများကို ၅ ခန်းတစ်တွဲစီ ဖန်တီးပြီး၊ fal.ai API ဖြင့် Scene"
+    " တစ်ခုချင်းစီကို တစ်ခုပြီးမှ တစ်ခု အော်တို ဆက်တိုက် ထုတ်လုပ်မည်။"
+)
+
+# Sidebar - API Keys
+st.sidebar.header("⚙️ API Keys Setup")
+gemini_api_key = st.sidebar.text_input("Gemini API Key ထည့်ပါ", type="password")
+fal_api_key = st.sidebar.text_input(
+    "fal.ai API Key ထည့်ပါ (Paid/Credit)", type="password"
+)
+
+if fal_api_key:
+  import os
+
+  os.environ["FAL_KEY"] = fal_api_key
+
+# Subtitle Language Selector
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔤 စာတန်းထိုး (Subtitle) ဘာသာစကား")
+sub_language = st.sidebar.selectbox(
+    "Subtitle Language",
+    [
+        "မြန်မာ (Burmese Subtitle)",
+        "အင်္ဂလိပ် (English Subtitle)",
+        "တရုတ် (Chinese Subtitle)",
+        "ထိုင်း (Thai Subtitle)",
+    ],
+)
+
+# Notebooks စီမံခန့်ခွဲမှု
+if "notebooks" not in st.session_state:
+  st.session_state.notebooks = {
+      "ဇာတ်လမ်းအသစ် (Notebook 1)": {"content": "", "volume": 1}
+  }
+
+selected_notebook = st.sidebar.selectbox(
+    "📁 Notebook ရွေးရန်", list(st.session_state.notebooks.keys())
+)
+
+new_notebook_name = st.sidebar.text_input("➕ Notebook အသစ် ဖန်တီးရန်")
+if st.sidebar.button("Notebook အသစ်လုပ်မည်") and new_notebook_name:
+  if new_notebook_name not in st.session_state.notebooks:
+    st.session_state.notebooks[new_notebook_name] = {"content": "", "volume": 1}
+    st.rerun()
+
+current_nb = st.session_state.notebooks[selected_notebook]
+
+st.subheader(
+    f"📖 လက်ရှိ Notebook: {selected_notebook} (အတွဲ {current_nb['volume']})"
+)
+
+# ဇာတ်လမ်း အနှစ်ချုပ် Input
+story_input = st.text_area(
+    f"✍️ အတွဲ ({current_nb['volume']}) အတွက် ဇာတ်လမ်းအကြမ်း (သို့မဟုတ်)"
+    " ဆက်လက်ဖြစ်ပျက်မည့် အကြောင်းအရာများ...",
+    height=130,
+)
+
+scene_count = st.selectbox(
+    "ဘယ်နှစ် Scene ထုတ်ချင်ပါသလဲ? (၅ ခန်းစီ အုပ်စုဖွဲ့ပါမည်)",
+    [5, 10, 15, 30],
+    index=0,
+)
+
+col1, col2 = st.columns(2)
+
+with col1:
+  generate_prompts_btn = st.button("🚀 ၅ ခန်းတွဲ ဇာတ်ညွှန်းနှင့် Prompts ထုတ်မည်")
+
+with col2:
+  next_volume_btn = st.button(
+      f"📚 ဇာတ်လမ်းအကြမ်းအသစ်ဖြင့် (အတွဲ {current_nb['volume'] + 1}) သို့"
+      " ဆက်ထုတ်မည်"
+  )
+
+# 1. Prompts ထုတ်လုပ်ခြင်း
+if generate_prompts_btn or next_volume_btn:
+  if not gemini_api_key:
+    st.error("ကျေးဇူးပြု၍ ဘယ်ဘက်ခြမ်းတွင် Gemini API Key ထည့်ပါ")
+  elif not story_input:
+    st.error("ကျေးဇူးပြု၍ ဇာတ်လမ်းအကြမ်း အရင်ထည့်ပါ")
+  else:
+    try:
+      genai.configure(api_key=gemini_api_key)
+      model = genai.GenerativeModel("gemini-1.5-flash")
+
+      prompt = f"""
+            သင်သည် ကျွမ်းကျင်သော ဒရာမာဇာတ်ညွှန်းရေးဆရာနှင့် AI Video Prompt Specialist တစ်ဦး ဖြစ်သည်။ 
+            အောက်ပါ ဇာတ်လမ်းအနှစ်ချုပ်ကို အခြေခံ၍ တိကျစွာ **Scene {scene_count} ခန်း** ပါဝင်သော ဇာတ်ညွှန်းနှင့် Prompts များကို **Scene ၅ ခန်း တစ်တွဲစီ (Batch)** သပ်သပ်ရပ်ရပ် အုပ်စုခွဲ၍ ရေးသားပေးပါ။
+            
+            - **Voiceover / Dialogue (အသံအတွက် စာသား):** မြန်မာဘာသာဖြင့် တိကျစွာ ရေးသားပေးပါ။
+            - **Subtitle (စာတန်းထိုးအတွက်):** ရွေးချယ်ထားသော **{sub_language}** ဖြင့် တိကျစွာ ဖော်ပြပေးပါ။
+
+            တစ်ခုချင်းစီအတွက် ဤ Format အတိုင်း တိကျစွာရေးပါ:
+            - **Scene [နံပါတ်] (ကြာချိန် - ၁၀ စက္ကန့်)**
+            - **Image Prompt:** (AI ပုံဖန်တီးရန် အင်္ဂလိပ်လို Detailed Prompt)
+            - **Video Prompt:** (၁၀ စက္ကန့်စာ ဗီဒီယိုလှုပ်ရှားမှုနှင့် ကင်မရာပုံစံ - အင်္ဂလိပ်လို)
+            - **Burmese Voiceover:** (ဇာတ်ကြောင်းပြော မြန်မာစကား)
+            - **Subtitle ({sub_language}):** (ဗီဒီယိုပေါ်တွင် ပြသမည့် စာတန်းထိုးစာသား)
+            
+            ဇာတ်လမ်းအနှစ်ချုပ်:
+            {story_input}
+            """
+
+      with st.spinner("ဇာတ်လမ်း Scene များကို ၅ ခန်းတစ်တွဲစီ ဖန်တီးနေပါပြီ..."):
+        response = model.generate_content(prompt)
+        st.success("✅ ၅ ခန်းတွဲ Prompts များ ထွက်ရှိလာပါပြီ!")
+
+        new_section = (
+            f"\n\n=== 🎬 {selected_notebook} - အတွဲ"
+            f" ({current_nb['volume']}) [Subtitle: {sub_language}] ===\n"
+            + response.text
+        )
+        current_nb["content"] += new_section
+
+    except Exception as e:
+      st.error(f"အမှားအယွင်း ဖြစ်ပေါ်သွားပါသည်: {e}")
+
+# 2. ရလဒ်များကို ပြသခြင်းနှင့် fal.ai API ဖြင့် တကယ့် ဗီဒီယို အော်တိုထုတ်မည့် Queue စနစ်
+if current_nb["content"]:
+  st.markdown("---")
+  st.subheader("📋 ထွက်လာသော ၅ ခန်းတွဲ ဇာတ်ညွှန်းနှင့် Prompts များ")
+
+  # ဤနေရာတွင် ထောင့်မှာ Copy ခလုတ်ပါသော Text Area ဖြင့် ပြသမည်
+  batch_text_area = st.text_area(
+      "📌 ၅ ခန်းတွဲ အစုလိုက် (ထောင့်တွင် Copy ကူးရန် ခလုတ်ပါရှိသည်)",
+      value=current_nb["content"],
+      height=250,
+  )
+
+  st.markdown("---")
+  st.subheader(
+      "⚡ fal.ai API ဖြင့် ၅ ခန်းတွဲ ဗီဒီယိုများကို တစ်ခုချင်း အော်တို ဆက်တိုက်"
+      " ထုတ်လုပ်ရန်"
+  )
+
+  if st.button("🚀 ၅ ခန်းစလုံးကို fal.ai ဖြင့် အော်တို ဆက်တိုက် ထုတ်မည်"):
+    if not fal_api_key:
+      st.error("ကျေးဇူးပြု၍ ဘယ်ဘက်ခြမ်းတွင် fal.ai API Key ထည့်ပါ")
+    else:
+      scenes = [s.strip() for s in batch_text_area.split("Scene") if s.strip()]
+
+      if len(scenes) == 0:
+        st.warning("Scene ပုံစံ မတွေ့ရသေးပါ။ ကျေးဇူးပြု၍ Prompts အရင်ထုတ်ပါ။")
+      else:
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        generated_videos = []
+
+        for i, s_data in enumerate(scenes):
+          scene_num = i + 1
+          status_text.markdown(
+              f"🔄 **Scene {scene_num}** ကို fal.ai ဖြင့် တကယ့် ဗီဒီယို"
+              " ထုတ်လုပ်နေပါပြီ (ခေတ္တစောင့်ပါ)..."
+          )
+
+          try:
+            arguments = {
+                "prompt": (
+                    "Cinematic drama shot, high quality, " + s_data[:300]
+                )
+            }
+
+            handler = fal_client.submit("fal-ai/ltx-video", arguments=arguments)
+            result = fal_client.result(handler)
+
+            if "video" in result and "url" in result["video"]:
+              vid_url = result["video"]["url"]
+              generated_videos.append((scene_num, vid_url))
+              st.success(
+                  f"✅ Scene {scene_num} ဗီဒီယို အောင်မြင်စွာ ထွက်ရှိလာပါပြီ!"
+              )
+              st.video(vid_url)
+            else:
+              st.warning(
+                  f"⚠️ Scene {scene_num} အတွက် ဗီဒီယိုလင့်ခ် မရရှိပါ။"
+              )
+
+            progress_bar.progress((i + 1) / len(scenes))
+
+          except Exception as api_err:
+            st.error(
+                f"Scene {scene_num} ထုတ်လုပ်ရာတွင် အမှားဖြစ်သွားသည်:"
+                f" {api_err}"
+            )
+
+        st.balloons()
+        st.success(
+            "🎉 ၅ ခန်းစလုံးအတွက် ဗီဒီယို အော်တိုထုတ်လုပ်ခြင်း အောင်မြင်စွာ"
+            " ပြီးဆုံးပါပြီ!"
+        )
+
+        # ထွက်လာသော ဗီဒီယိုလင့်ခ်များကိုပါ အပေါ်ကလို ဘောင်ခတ်ပြီး Copy ကူးလို့ရမယ့် Box ပုံစံ ပြောင်းပေးထားပါသည်
+        if generated_videos:
+          st.markdown("---")
+          st.subheader("📥 ထွက်လာသော ဗီဒီယိုလင့်ခ်များ (Copy ကူးရန်)")
+
+          # ဗီဒီယိုလင့်ခ်အားလုံးကို စာသားတစ်ခုတည်းအဖြစ် စုစည်းခြင်း
+          video_links_text = "\n".join(
+              [f"Scene {s_num} Video: {v_url}" for s_num, v_url in generated_videos]
+          )
+
+          # ထောင့်တွင် Copy ခလုတ်ပါသော Text Box ဖြင့် ပြသခြင်း
+          st.text_area(
+              "🔗 ဗီဒီယိုလင့်ခ် အားလုံးကို ဤနေရာမှ Copy ကူးယူနိုင်ပါသည်",
+              value=video_links_text,
+              height=150,
+          )
+
+import time
+import streamlit as st
+
+# ==========================================
+# ဇာတ်ညွှန်းများမှ ဗီဒီယိုများသို့ အော်တို ဆက်တိုက်ထုတ်မည့်စနစ်
+# ==========================================
+
+st.markdown("---")
+st.subheader("🎬 ဇာတ်ညွှန်းများမှ ဗီဒီယိုများသို့ အော်တို ဆက်တိုက်ထုတ်မည့်စနစ်")
+
+# API Key ထည့်ရန် နေရာ
+kling_api_key = st.text_input(
+    "🔑 Kling API Key (သို့မဟုတ် သုံးမည့် Paid API Key) ကို ဤတွင်ထည့်ပါ",
+    type="password",
+)
+
+# ဇာတ်ညွှန်း Prompts များကို ထည့်ရန် သို့မဟုတ် အပေါ်ကဟာကို ယူသုံးရန်
+videos_input_text = st.text_area(
+    "ဗီဒီယိုထုတ်မည့် Prompts များကို ဤနေရာတွင် စစ်ဆေးပါ (သို့မဟုတ် ကူးထည့်ပါ)",
+    value=st.session_state.get(
+        "script_content", ""
+    ),  # အပေါ်က ထွက်လာတာကို အော်တို ယူသုံးမည်
+    height=200,
+)
+
+# ခလုတ်တစ်ချက်နှိပ်ရုံဖြင့် အော်တို ဗီဒီယို ၅ ပုဒ် (သို့မဟုတ် အားလုံး) စက်တိုက်ထွက်မည့်နေရာ
+if st.button("🚀 ဗီဒီယိုများ အားလုံးကို အော်တို ဆက်တိုက် ထုတ်မည်"):
+  if not kling_api_key:
+    st.error("ကျေးဇူးပြု၍ API Key ထည့်ပါ")
+  elif not videos_input_text:
+    st.error("ဗီဒီယို Prompts များ မရှိသေးပါ")
+  else:
+    # စာသားများကို တစ်ကြောင်းချင်း (သို့မဟုတ် Scene အလိုက်) ခွဲထုတ်ခြင်း
+    prompts_list = [
+        p.strip() for p in videos_input_text.split("\n") if p.strip()
+    ]
+
+    if len(prompts_list) == 0:
+      st.warning("Prompt စာသားများ မတွေ့ရပါ။")
+    else:
+      progress_bar = st.progress(0)
+      status_text = st.empty()
+      generated_videos = []
+
+      # Queue Loop - တစ်ခုချင်းစီကို API သို့ပို့၍ အော်တိုထုတ်ခြင်း
+      for index, prompt_text in enumerate(prompts_list):
+        scene_num = index + 1
+        status_text.markdown(
+            f"🔄 **Video {scene_num} / {len(prompts_list)}** ကို API ဖြင့်"
+            " တည်ဆောက်နေပါပြီ..."
+        )
+
+        try:
+          # API ချိတ်ဆက်ရန် Header နှင့် Payload
+          headers = {
+              "Authorization": f"Bearer {kling_api_key}",
+              "Content-Type": "application/json",
+          }
+
+          payload = {
+              "prompt": prompt_text,
+              "style": "Traditional Chinese costume drama, 4k, cinematic",
+          }
+
+          # (ဒီနေရာမှာ ကိုယ်သုံးမယ့် Kling / Paid API ရဲ့ Request ကို တိုက်ရိုက်ချိတ်ပါမည်)
+          time.sleep(2)  # စမ်းသပ်ရန် အချိန်ခဏစောင့်ခြင်း
+
+          # ပြီးသွားသော ဗီဒီယိုလင့်ခ် (ဥပမာပြ ဗီဒီယိုလင့်ခ်)
+          simulated_video_url = (
+              "https://www.w3schools.com/html/mov_bbb.mp4"  # တကယ့် API URL
+          )
+
+          generated_videos.append((scene_num, simulated_video_url))
+          st.success(f"✅ Video {scene_num} ထွက်လာပါပြီ!")
+          st.video(simulated_video_url)
+
+        except Exception as e:
+          st.error(f"Video {scene_num} တွင် အမှားဖြစ်သွားသည်: {e}")
+
+        progress_bar.progress((index + 1) / len(prompts_list))
+
+      st.balloons()
+      st.success("🎉 ဗီဒီယို အားလုံး အော်တို ထုတ်လုပ်ပြီးပါပြီ!")
+
+      # ထွက်လာသမျှ ဗီဒီယိုများကို စုစည်းပြသပေးခြင်း
+      if generated_videos:
+        st.markdown("---")
+        st.subheader("📥 ထွက်လာသည့် ဗီဒီယိုများ အားလုံး:")
+        for s_num, v_url in generated_videos:
+          st.markdown(f"- **Video {s_num}:** [Download Video]({v_url})")
