@@ -101,9 +101,9 @@ if generate_btn or next_volume_btn:
   else:
     try:
       genai.configure(api_key=api_key)
-      model = genai.GenerativeModel("gemini-1.5-flash")
-
-      prompt = f"""
+      model = genai.GenerativeModel(
+      gemini-2.5-flash)
+prompt = f"""
             သင်သည် ကျွမ်းကျင်သော ဒရာမာဇာတ်ညွှန်းရေးဆရာနှင့် AI Video Prompt Specialist တစ်ဦး ဖြစ်သည်။ 
             အောက်ပါ ဇာတ်လမ်းအနှစ်ချုပ်ကို အခြေခံ၍ တိကျစွာ **Scene {scene_count} ခန်း** ပါဝင်သော ဇာတ်ညွှန်းနှင့် Prompts များကို **Scene ၅ ခန်း တစ်တွဲစီ (Batch: Scene 1-5, 6-10 စသည်ဖြင့်)** သပ်သပ်ရပ်ရပ် အုပ်စုခွဲ၍ ရေးသားပေးပါ။
             
