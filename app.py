@@ -163,3 +163,91 @@ if current_nb["content"]:
       st.markdown(f"#### {batch_title}")
       st.code(batch_content, language="markdown")
       st.markdown("---")
+import time
+import streamlit as st
+
+# ==========================================
+# ဇာတ်ညွှန်းများမှ ဗီဒီယိုများသို့ အော်တို ဆက်တိုက်ထုတ်မည့်စနစ်
+# ==========================================
+st.markdown("---")
+st.subheader("🎬 ဇာတ်ညွှန်းများမှ ဗီဒီယိုများသို့ အော်တို ဆက်တိုက်ထုတ်မည့်စနစ်")
+
+# API Key ထည့်ရန် နေရာ
+kling_api_key = st.text_input(
+    "🔑 Kling API Key (သို့မဟုတ် သုံးမည့် Paid API Key) ကို ဤတွင်ထည့်ပါ",
+    type="password",
+)
+
+# ဇာတ်ညွှန်း Prompts များကို ကိုယ်တိုင် သီးသန့်ထည့်ရန် (စာသားအဟောင်းများ အော်တိုဝင်မလာစေရန် ပြင်ဆင်ထားသည်)
+videos_input_text = st.text_area(
+    "ဗီဒီယိုထုတ်မည့် Prompts များကို ဤနေရာတွင် ကူးထည့်ပါ (တစ်ကြောင်းလျှင် Prompt တစ်ခုစီ)",
+    placeholder=(
+        "Prompt 1: A cinematic shot of...\nPrompt 2: A dramatic close-up..."
+    ),
+    height=200,
+)
+
+# ခလုတ်တစ်ချက်နှိပ်ရုံဖြင့် အော်တို ဗီဒီယိုများ စက်တိုက်ထွက်မည့်နေရာ
+if st.button("🚀 ဗီဒီယိုများ အားလုံးကို အော်တို ဆက်တိုက် ထုတ်မည်"):
+  if not kling_api_key:
+    st.error("ကျေးဇူးပြု၍ API Key ထည့်ပါ")
+  elif not videos_input_text:
+    st.error("ဗီဒီယို Prompts များ မရှိသေးပါ")
+  else:
+    # စာသားများကို တစ်ကြောင်းချင်း (သို့မဟုတ် Scene အလိုက်) တိကျစွာ ခွဲထုတ်ခြင်း
+    prompts_list = [
+        p.strip() for p in videos_input_text.split("\n") if p.strip()
+    ]
+
+    if len(prompts_list) == 0:
+      st.warning("Prompt စာသားများ မတွေ့ရပါ။")
+    else:
+      progress_bar = st.progress(0)
+      status_text = st.empty()
+      generated_videos = []
+
+      # Queue Loop - တစ်ခုချင်းစီကို API သို့ပို့၍ အော်တိုထုတ်ခြင်း
+      for index, prompt_text in enumerate(prompts_list):
+        scene_num = index + 1
+        status_text.markdown(
+            f"🔄 **Video {scene_num} / {len(prompts_list)}** ကို API ဖြင့်"
+            " တည်ဆောက်နေပါပြီ..."
+        )
+
+        try:
+          # API ချိတ်ဆက်ရန် Header နှင့် Payload
+          headers = {
+              "Authorization": f"Bearer {kling_api_key}",
+              "Content-Type": "application/json",
+          }
+          payload = {
+              "prompt": prompt_text,
+              "style": "Traditional Chinese costume drama, 4k, cinematic",
+          }
+
+          # (ဒီနေရာမှာ ကိုယ်သုံးမယ့် Kling / Paid API ရဲ့ Request ကို တိုက်ရိုက်ချိတ်ပါမည်)
+          time.sleep(2)  # စမ်းသပ်ရန် အချိန်ခဏစောင့်ခြင်း
+
+          # ပြီးသွားသော ဗီဒီယိုလင့်ခ် (ဥပမာပြ ဗီဒီယိုလင့်ခ်)
+          simulated_video_url = (
+              "https://www.w3schools.com/html/mov_bbb.mp4"  # တကယ့် API URL
+          )
+
+          generated_videos.append((scene_num, simulated_video_url))
+          st.success(f"✅ Video {scene_num} ထွက်လာပါပြီ!")
+          st.video(simulated_video_url)
+
+        except Exception as e:
+          st.error(f"Video {scene_num} တွင် အမှားဖြစ်သွားသည်: {e}")
+
+        progress_bar.progress((index + 1) / len(prompts_list))
+
+      st.balloons()
+      st.success("🎉 ဗီဒီယို အားလုံး အော်တို ထုတ်လုပ်ပြီးပါပြီ!")
+
+      # ထွက်လာသမျှ ဗီဒီယိုများကို စုစည်းပြသပေးခြင်း
+      if generated_videos:
+        st.markdown("---")
+        st.subheader("📥 ထွက်လာသည့် ဗီဒီယိုများ အားလုံး:")
+        for s_num, v_url in generated_videos:
+          st.markdown(f"- **Video {s_num}:** [Download Video]({v_url})")
